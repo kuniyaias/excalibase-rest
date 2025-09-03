@@ -1,0 +1,24 @@
+# Test configuration for Excalibase REST API
+spring:
+  datasource:
+    # Will be overridden by Testcontainers in integration tests
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+
+# Application test configuration
+app:
+  allowed-schema: public
+  database-type: postgres
+  max-page-size: 100 # Smaller for tests
+  default-page-size: 10 # Smaller for tests
+  schema-cache-ttl-seconds: 1 # Short cache for tests
+
+# Logging for tests
+logging:
+  level:
+    io.github.excalibase: DEBUG
+    org.springframework.jdbc.core: WARN
+    org.springframework.web: WARN
+    org.testcontainers: INFO
