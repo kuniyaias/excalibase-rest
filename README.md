@@ -1,437 +1,454 @@
 # Excalibase REST API
+[![CI](https://github.com/excalibase/excalibase-rest/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/excalibase/excalibase-rest/actions/workflows/ci.yml)
+[![E2E Tests](https://github.com/excalibase/excalibase-rest/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/excalibase/excalibase-rest/actions/workflows/e2e.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Java Version](https://img.shields.io/badge/Java-21+-orange.svg)](https://openjdk.java.net/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 
-A standalone REST API for PostgreSQL databases that automatically generates endpoints from your database schema with advanced filtering, relationships, and comprehensive PostgreSQL type support.
+## 🚀 Overview
 
-## 🚀 Features
+Excalibase REST is a powerful Spring Boot application that **automatically generates REST API endpoints from your existing PostgreSQL database tables**. It eliminates the need for manual API development and provides instant REST APIs with advanced features like pagination, filtering, relationship expansion, and comprehensive CRUD operations.
 
-- **Auto-Generated Endpoints**: Automatically creates REST endpoints for all tables in your PostgreSQL database
-- **Advanced Filtering**: PostgREST-style filtering with 15+ operators (`eq`, `gt`, `like`, `in`, `haskey`, `arraycontains`, etc.)
-- **Relationship Expansion**: Traverse foreign key relationships with the `expand` parameter
-- **Dual Pagination**: Both offset-based and cursor-based (GraphQL connections style) pagination
-- **Enhanced PostgreSQL Types**: Full support for JSON, arrays, network types, custom enums, and composite types
-- **Bulk Operations**: Create, update, and delete multiple records in a single request
-- **OpenAPI 3.0**: Auto-generated OpenAPI specification with interactive documentation
-- **Security**: Built-in SQL injection protection and input validation
+### ✨ Current Features
+- **🔄 Automatic Endpoint Generation**: Creates REST endpoints from PostgreSQL tables
+- **📊 Rich Querying**: Advanced filtering, sorting, and pagination
+- **🗓️ Enhanced Date/Time Filtering**: Comprehensive date and timestamp operations
+- **🔍 Advanced Filter Types**: String, numeric, boolean filters with operators like eq, neq, gt, gte, lt, lte, in, notin, like, ilike
+- **🎯 Custom PostgreSQL Types**: Full support for custom enum and composite types
+- **📄 Enhanced PostgreSQL Data Types**: JSON/JSONB with object support, arrays with proper mapping, network types (INET, CIDR), datetime, and XML support  
+- **🔗 Relationship Expansion**: Automatic foreign key relationship handling with expand parameters
+- **🛠️ CRUD Operations**: Full create, read, update, delete support with **composite key support**
+- **🔑 Composite Primary Keys**: Complete support for tables with multi-column primary keys
+- **🔄 Composite Foreign Keys**: Seamless handling of multi-column foreign key relationships
+- **📄 Offset & Cursor Pagination**: Both traditional offset-based and GraphQL-style cursor pagination
+- **⚡ N+1 Prevention**: Efficient relationship loading
+- **🔧 OR Operations**: Complex logical conditions with SQL-style syntax
+- **🛡️ Security Controls**: Input validation, SQL injection prevention, and request limiting
+- **📋 Bulk Operations**: Transaction-safe bulk create, update, and delete operations via array input
+- **🐳 Docker Support**: Container images with Docker Compose setup
+- **📖 OpenAPI 3.0**: Auto-generated API documentation with Swagger UI compatibility (JSON/YAML formats)
+- **🔍 Schema Introspection**: Dynamic PostgreSQL schema discovery with type information endpoints
+- **⚡ Query Complexity Analysis**: Performance monitoring and query complexity limits
+- **💾 Schema Caching**: Performance optimization with configurable TTL-based caching
+- **🔄 CI/CD Pipeline**: GitHub Actions integration with automated testing
+
+### 🚧 Planned Features
+
+- [ ] **MySQL Support** - Complete MySQL database integration
+- [ ] **Oracle Support** - Add Oracle database compatibility
+- [ ] **SQL Server Support** - Microsoft SQL Server implementation
+- [ ] **Authentication/Authorization** - Role-based access control
+- [ ] **GraphQL Integration** - Optional GraphQL endpoint alongside REST
+- [ ] **Real-time Subscriptions** - WebSocket-based change notifications
 
 ## 📋 Quick Start
 
 ### Prerequisites
 
 - Java 21+
-- PostgreSQL 12+
 - Maven 3.8+
+- PostgreSQL 15+
 
 ### Installation
 
-1. **Clone the repository:**
+#### Option 1: Docker (Recommended)
+
+1. **Clone the repository**
    ```bash
    git clone https://github.com/excalibase/excalibase-rest.git
    cd excalibase-rest
    ```
 
-2. **Configure your database connection:**
+2. **Configure your database**
+
+   Edit `docker-compose.yml` or set environment variables:
    ```yaml
-   # src/main/resources/application.yaml
+   environment:
+     - SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/your_database
+     - SPRING_DATASOURCE_USERNAME=your_username
+     - SPRING_DATASOURCE_PASSWORD=your_password
+     - APP_ALLOWED_SCHEMA=your_schema
+     # Optional configuration
+     - APP_MAX_PAGE_SIZE=1000
+     - APP_DEFAULT_PAGE_SIZE=100
+   ```
+
+3. **Run with Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Access REST API endpoints**
+
+   Your REST API will be available at: `http://localhost:20000/api/v1`
+   
+   - API Documentation: `http://localhost:20000/api/v1/docs`
+   - OpenAPI JSON: `http://localhost:20000/api/v1/openapi.json`
+   - Swagger UI: `http://localhost:20000/swagger-ui.html`
+
+#### Option 2: Local Development
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/excalibase/excalibase-rest.git
+   cd excalibase-rest
+   ```
+
+2. **Configure your database**
+
+   Create `application-dev.yml` or set environment variables:
+   ```yaml
    spring:
      datasource:
        url: jdbc:postgresql://localhost:5432/your_database
        username: your_username
        password: your_password
-   
+
    app:
-     allowed-schema: your_schema  # default: public
+     allowed-schema: your_schema
+     database-type: postgres
    ```
 
-3. **Build and run:**
+3. **Run the application**
    ```bash
    mvn clean install
    mvn spring-boot:run
    ```
 
-4. **Access the API:**
-   - API Base URL: `http://localhost:8080/api/v1`
-   - OpenAPI Spec: `http://localhost:8080/api/v1/openapi.json`
-   - Documentation: `http://localhost:8080/api/v1/docs`
+4. **Access your API**
+   ```
+   http://localhost:20000/api/v1
+   ```
 
-## 📚 API Usage
+### Quick Development Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/excalibase/excalibase-rest.git
+cd excalibase-rest
+
+# Start development environment
+make dev-setup
+make quick-start
+
+# Your API is ready at http://localhost:20000/api/v1
+```
+
+## 🎯 API Usage Examples
 
 ### Basic CRUD Operations
 
 ```bash
-# Get all customers
-GET /api/v1/customer
+# Get all records with pagination
+curl "http://localhost:20000/api/v1/users?limit=10&offset=0"
 
-# Get customer by ID
-GET /api/v1/customer/123
+# Get single record
+curl "http://localhost:20000/api/v1/users/123"
 
-# Create a new customer
-POST /api/v1/customer
-{
-  "name": "John Doe",
-  "email": "john@example.com"
-}
+# Create new record
+curl -X POST "http://localhost:20000/api/v1/users" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Doe", "email": "john@example.com"}'
 
-# Update customer
-PUT /api/v1/customer/123
-{
-  "name": "John Smith",
-  "email": "johnsmith@example.com"
-}
+# Update record
+curl -X PUT "http://localhost:20000/api/v1/users/123" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Smith", "email": "john.smith@example.com"}'
 
 # Partial update
-PATCH /api/v1/customer/123
-{
-  "email": "newemail@example.com"
-}
+curl -X PATCH "http://localhost:20000/api/v1/users/123" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john.updated@example.com"}'
 
-# Delete customer
-DELETE /api/v1/customer/123
+# Delete record
+curl -X DELETE "http://localhost:20000/api/v1/users/123"
 ```
 
 ### Advanced Filtering
 
-Excalibase REST uses PostgREST-style filtering operators:
-
 ```bash
-# Basic operators
-GET /api/v1/orders?total=gte.100           # total >= 100
-GET /api/v1/users?age=gt.18                # age > 18
-GET /api/v1/products?name=like.phone       # name LIKE '%phone%'
-GET /api/v1/items?status=in.(pending,shipped)  # status IN ('pending', 'shipped')
+# Equality filtering
+curl "http://localhost:20000/api/v1/users?name=eq.John"
 
-# Enhanced PostgreSQL operations
-GET /api/v1/users?profile=haskey.admin     # JSON: profile ? 'admin'
-GET /api/v1/posts?tags=arraycontains.tech  # Array: tags @> ARRAY['tech']
-GET /api/v1/logs?data=jsoncontains.{"level":"error"}  # JSONB contains
+# Range filtering
+curl "http://localhost:20000/api/v1/users?age=gte.18&age=lt.65"
+
+# Text search
+curl "http://localhost:20000/api/v1/users?email=like.*@gmail.com"
+
+# Multiple values
+curl "http://localhost:20000/api/v1/users?status=in.(active,pending)"
 
 # OR conditions
-GET /api/v1/users?or=(age.gte.65,vip.is.true)  # age >= 65 OR vip = true
+curl "http://localhost:20000/api/v1/users?or=(name.like.John*,email.like.*@company.com)"
 
-# String operations
-GET /api/v1/products?name=startswith.iPhone  # name LIKE 'iPhone%'
-GET /api/v1/emails?address=endswith.gmail    # address LIKE '%gmail'
+# JSON filtering (for JSONB columns)
+curl "http://localhost:20000/api/v1/users?metadata=haskey.preferences"
 ```
 
 ### Relationship Expansion
 
-Expand related data using foreign key relationships:
+```bash
+# Expand related data
+curl "http://localhost:20000/api/v1/orders?expand=customer"
+
+# Expand with parameters
+curl "http://localhost:20000/api/v1/customers?expand=orders(limit:5,select:total,status)"
+
+# Multiple expansions
+curl "http://localhost:20000/api/v1/orders?expand=customer,items"
+```
+
+### Field Selection and Sorting
 
 ```bash
-# Expand customer information in orders
-GET /api/v1/orders?expand=customer
+# Select specific fields
+curl "http://localhost:20000/api/v1/users?select=name,email,created_at"
 
-# Expand multiple relationships
-GET /api/v1/orders?expand=customer,items
+# Sorting
+curl "http://localhost:20000/api/v1/users?orderBy=name&orderDirection=asc"
 
-# Parameterized expansion
-GET /api/v1/customers?expand=orders(limit:5,select:total,status)
-
-# Response includes related data
-{
-  "data": [{
-    "order_id": 1,
-    "customer_id": 123,
-    "total": 99.99,
-    "customer": {
-      "customer_id": 123,
-      "name": "John Doe",
-      "email": "john@example.com"
-    }
-  }]
-}
+# SQL-style ordering
+curl "http://localhost:20000/api/v1/users?order=name.asc,created_at.desc"
 ```
 
 ### Pagination
 
-#### Offset-based Pagination
 ```bash
-GET /api/v1/products?offset=20&limit=10
-```
+# Offset-based pagination
+curl "http://localhost:20000/api/v1/users?limit=10&offset=20"
 
-#### Cursor-based Pagination (GraphQL Connections)
-```bash
-# Forward pagination
-GET /api/v1/products?first=10&after=cursor123
-
-# Backward pagination  
-GET /api/v1/products?last=10&before=cursor456
-
-# Response format
-{
-  "edges": [
-    {
-      "node": { "id": 1, "name": "Product" },
-      "cursor": "eyJpZCI6MX0="
-    }
-  ],
-  "pageInfo": {
-    "hasNextPage": true,
-    "hasPreviousPage": false,
-    "startCursor": "eyJpZCI6MX0=",
-    "endCursor": "eyJpZCI6MTB9"
-  },
-  "totalCount": 150
-}
+# Cursor-based pagination (GraphQL connections style)
+curl "http://localhost:20000/api/v1/users?first=10&after=eyJpZCI6MTIzfQ=="
 ```
 
 ### Bulk Operations
 
 ```bash
-# Bulk create
-POST /api/v1/customers
-[
-  {"name": "John", "email": "john@example.com"},
-  {"name": "Jane", "email": "jane@example.com"}
-]
+# Bulk create (array input to POST endpoint)
+curl -X POST "http://localhost:20000/api/v1/users" \
+  -H "Content-Type: application/json" \
+  -d '[{"name": "User1"}, {"name": "User2"}, {"name": "User3"}]'
 
-# Response
-{
-  "data": [...],
-  "count": 2
-}
+# Bulk update (array input to PUT endpoint)
+curl -X PUT "http://localhost:20000/api/v1/users" \
+  -H "Content-Type: application/json" \
+  -d '[{"id": "1", "name": "Updated User1"}, {"id": "2", "name": "Updated User2"}]'
+
+# Bulk delete (query-based filtering)
+curl -X DELETE "http://localhost:20000/api/v1/users?status=eq.inactive"
+
+# Bulk update with filters (advanced filtering)
+curl -X PUT "http://localhost:20000/api/v1/users?status=eq.pending" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "active"}'
+
+# Upsert operations (with prefer header)
+curl -X POST "http://localhost:20000/api/v1/users?prefer=resolution=merge-duplicates" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "name": "John Doe"}'
 ```
 
-### Field Selection
+## 🏗️ Database Schema Discovery
+
+Excalibase REST automatically discovers your database schema and creates REST endpoints:
 
 ```bash
-# Select specific columns
-GET /api/v1/customers?select=name,email
+# Get all available tables
+curl "http://localhost:20000/api/v1"
 
-# Combined with relationships
-GET /api/v1/orders?select=total,status&expand=customer(select:name,email)
-```
+# Get table schema information
+curl "http://localhost:20000/api/v1/users/schema"
 
-### Sorting
+# Get OpenAPI specification
+curl "http://localhost:20000/api/v1/openapi.json"
+curl "http://localhost:20000/api/v1/openapi.yaml"
 
-```bash
-# Simple sorting
-GET /api/v1/products?orderBy=name&orderDirection=desc
+# Get custom PostgreSQL type information
+curl "http://localhost:20000/api/v1/types/my_enum_type"
 
-# PostgREST-style sorting with multiple columns
-GET /api/v1/orders?order=created_at.desc,total.asc
-```
-
-## 🗄️ Enhanced PostgreSQL Type Support
-
-Excalibase REST provides comprehensive support for PostgreSQL's advanced data types:
-
-### JSON/JSONB Operations
-```bash
-# Check if JSON has key
-GET /api/v1/users?profile=haskey.preferences
-
-# Check for multiple keys
-GET /api/v1/documents?metadata=haskeys.["author","title"]
-
-# JSON contains query
-GET /api/v1/configs?settings=jsoncontains.{"theme":"dark"}
-```
-
-### Array Operations
-```bash
-# Array contains element
-GET /api/v1/posts?tags=arraycontains.technology
-
-# Array has any of these elements
-GET /api/v1/users?skills=arrayhasany.["python","java"]
-
-# Array contains all elements
-GET /api/v1/products?features=arrayhasall.["waterproof","wireless"]
-
-# Filter by array length
-GET /api/v1/lists?items=arraylength.5
-```
-
-### Network Types
-```bash
-# Basic string operations work with INET, CIDR, MACADDR
-GET /api/v1/servers?ip_address=like.192.168%
-```
-
-### Custom Types
-```bash
-# Enum values work as strings
-GET /api/v1/orders?status=eq.pending
-
-# Composite types work as JSON objects
-POST /api/v1/addresses
-{
-  "location": {
-    "street": "123 Main St",
-    "city": "Anytown",
-    "state": "CA"
-  }
-}
+# Query complexity limits and analysis
+curl "http://localhost:20000/api/v1/complexity/limits"
+curl -X POST "http://localhost:20000/api/v1/complexity/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{"table": "users", "params": {"status": "active"}, "limit": 100, "expand": "orders"}'
 ```
 
 ## 🔧 Configuration
 
-### Application Configuration
+### Application Properties
 
 ```yaml
-# application.yaml
 app:
   # Database configuration
-  allowed-schema: public
-  database-type: postgres
-  
-  # Pagination limits
-  max-page-size: 1000
-  default-page-size: 100
-  
-  # Cache settings
-  schema-cache-ttl-seconds: 300
-  
+  allowed-schema: public        # Database schema to expose
+  database-type: postgres       # Database type
+
+  # Pagination configuration
+  max-page-size: 1000          # Maximum pagination limit
+  default-page-size: 100       # Default pagination size
+
+  # Cache configuration
+  schema-cache-ttl-seconds: 300 # Schema cache TTL (5 minutes)
+
   # CORS configuration
   cors:
     enabled: true
     allowed-origins: ["*"]
-    allowed-methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
-  
-  # Security settings  
+    allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+    allowed-headers: ["*"]
+    allow-credentials: false
+    max-age: 3600
+
+  # Security configuration
   security:
     enable-sql-injection-protection: true
     enable-table-name-validation: true
-    max-request-body-size: 1048576
+    enable-column-name-validation: true
+    max-request-body-size: 1048576 # 1MB
+    max-query-complexity: 100
+
+  # Query complexity limits
+  query:
+    max-complexity-score: 1000
+    max-depth: 10
+    max-breadth: 50
+    complexity-analysis-enabled: true
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydb
+    username: myuser
+    password: mypass
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 300000
 ```
 
 ### Environment Variables
 
 ```bash
+# Database connection
 export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/mydb
 export SPRING_DATASOURCE_USERNAME=myuser
 export SPRING_DATASOURCE_PASSWORD=mypass
-export APP_ALLOWED_SCHEMA=myschema
+
+# Application settings
+export APP_ALLOWED_SCHEMA=public
+export APP_MAX_PAGE_SIZE=1000
+export APP_DEFAULT_PAGE_SIZE=100
+export APP_SCHEMA_CACHE_TTL_SECONDS=300
+
+# Query complexity limits
+export APP_QUERY_MAX_COMPLEXITY_SCORE=1000
+export APP_QUERY_MAX_DEPTH=10
+export APP_QUERY_MAX_BREADTH=50
+
+# Security settings
+export APP_SECURITY_MAX_REQUEST_BODY_SIZE=1048576
 ```
 
-## 📖 API Documentation
-
-### OpenAPI Specification
-
-- **JSON**: `GET /api/v1/openapi.json`
-- **YAML**: `GET /api/v1/openapi.yaml`
-- **Documentation Info**: `GET /api/v1/docs`
-
-### Schema Introspection
-
-```bash
-# List all tables
-GET /api/v1
-
-# Get table schema
-GET /api/v1/customers/schema
-```
-
-### Interactive Documentation
-
-Import the OpenAPI specification into:
-- **Swagger UI**: Use the `/openapi.json` URL
-- **Postman**: Import as OpenAPI 3.0 collection
-- **Insomnia**: Import as OpenAPI specification
-
-## 🛡️ Security Features
-
-- **SQL Injection Protection**: Parameterized queries and input validation
-- **Table Name Validation**: Prevents access to unauthorized tables
-- **Column Name Validation**: Validates column names against schema
-- **Request Size Limits**: Configurable maximum request body size
-- **CORS Support**: Configurable cross-origin resource sharing
-
-## 🏗️ Development
-
-### Building
-
-```bash
-# Clean build
-mvn clean install
-
-# Skip tests
-mvn clean install -DskipTests
-
-# Run tests only
-mvn test
-```
+## 🧪 Testing
 
 ### Running Tests
 
 ```bash
-# All tests
-mvn test
+# Maven Tests
+mvn test                              # All tests (unit + integration)
+mvn test -Dtest="*Test,!*IntegrationTest"  # Unit tests only
+mvn test -Dtest="*IntegrationTest"    # Integration tests only
+mvn clean test jacoco:report          # Tests with coverage report
 
-# Integration tests with Testcontainers
-mvn test -Dtest="*IntegrationTest"
+# Make Commands (with Docker services)
+make test               # Start services + run all tests
+make test-maven         # Run Maven tests
+make test-unit          # Unit tests only
+make test-integration   # Integration tests only
+make test-coverage      # Coverage report
+make e2e                # Complete E2E test suite
+make test-quick         # Quick test (skip build)
 ```
 
-### Code Quality
+### Test Coverage
+
+- **Unit Tests**: Service layer business logic
+- **Integration Tests**: Database operations with Testcontainers
+- **E2E Tests**: Full API endpoint testing
+- **Performance Tests**: Load testing with realistic data
+- **Security Tests**: SQL injection and input validation
+
+## 🚀 Development
+
+### Development Commands
 
 ```bash
-# Generate test coverage report
-mvn clean test jacoco:report
+# Development Environment
+make dev-setup          # Setup PostgreSQL database only
+make quick-start         # Setup database + start application
+make run                 # Run application locally
+make dev-teardown        # Cleanup development environment
 
-# Generate Javadoc
-mvn javadoc:javadoc
+# Testing Commands
+make test               # Start services and run all tests
+make test-maven         # Run all Maven tests (unit + integration)
+make test-unit          # Run unit tests only
+make test-integration   # Run integration tests only
+make test-coverage      # Run tests with coverage report
+make e2e                # Complete E2E test suite with cleanup
+
+# Build and Package
+make build              # Build application with Maven
+make package            # Package JAR for distribution
+make install            # Install to local Maven repository
+
+# Docker Commands
+make docker-build       # Build Docker image
+make docker-run         # Run application in Docker
+make build-image        # Build image for E2E testing
+
+# Development Utilities
+make health             # Check API health status
+make db-shell           # Connect to database shell
+make db-reset           # Reset database schema
+make logs               # Show all service logs
+make status             # Show service status
+make restart            # Restart all services
+make clean              # Stop services and cleanup
 ```
 
-## 🔍 Monitoring
-
-The application includes Spring Boot Actuator endpoints:
+### Building and Packaging
 
 ```bash
-# Health check
-GET /actuator/health
+# Build application
+mvn clean install
 
-# Application info
-GET /actuator/info
+# Build Docker image
+docker build -t excalibase/excalibase-rest .
 
-# Metrics
-GET /actuator/metrics
+# Package for distribution
+mvn clean package -DskipTests
 ```
 
-## 🚀 Performance
+## 📖 Documentation
 
-- **Connection Pooling**: HikariCP with optimized settings
-- **Schema Caching**: Configurable TTL cache for database metadata
-- **Efficient Queries**: N+1 query prevention in relationship expansion
-- **Pagination**: Built-in limits to prevent large result sets
-
-## 📝 Examples
-
-### E-commerce API
-
-```bash
-# Get products with inventory and category info
-GET /api/v1/products?expand=category,inventory&status=eq.active
-
-# Get customer orders with items
-GET /api/v1/customers/123?expand=orders(expand:items,limit:10)
-
-# Search products by name and filter by price range
-GET /api/v1/products?name=like.laptop&price=gte.500&price=lte.2000
-
-# Get recent orders with customer details
-GET /api/v1/orders?created_at=gte.2024-01-01&expand=customer&order=created_at.desc
-```
-
-### Analytics Queries
-
-```bash
-# Users with specific preferences
-GET /api/v1/users?preferences=haskey.notifications
-
-# Posts with multiple tags
-GET /api/v1/posts?tags=arrayhasall.["tech","news"]
-
-# Configuration with specific settings
-GET /api/v1/configs?settings=jsoncontains.{"enabled":true}
-```
+- **[API Reference](docs/api-reference.md)** - Complete REST API documentation
+- **[Filtering Guide](docs/filtering.md)** - Advanced filtering and querying
+- **[Configuration](docs/configuration.md)** - Setup and configuration options
+- **[Examples](docs/examples.md)** - Real-world usage examples
+- **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
 
 ## 🤝 Contributing
 
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
 ## 📄 License
 
@@ -439,6 +456,19 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 🙏 Acknowledgments
 
-- Inspired by [PostgREST](https://postgrest.org/) for API design patterns
-- Built with Spring Boot and Java 21
-- PostgreSQL for advanced database features
+- Spring Boot team for the excellent framework
+- PostgreSQL community for the robust database
+- PostgREST project for inspiring our filtering syntax
+- GraphQL community for pagination and filtering patterns
+
+## 🔗 Related Projects
+
+- **[Excalibase GraphQL](https://github.com/excalibase/excalibase-graphql)** - GraphQL version of this project
+- **[PostgREST](https://postgrest.org/)** - Inspiration for REST API design
+- **[Hasura](https://hasura.io/)** - GraphQL engine for databases
+
+---
+
+<div align="center">
+  <strong>Transform your PostgreSQL database into a powerful REST API in minutes</strong>
+</div>

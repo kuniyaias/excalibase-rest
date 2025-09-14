@@ -1,132 +1,329 @@
-# Makefile for Excalibase REST API
+# Excalibase REST API Makefile
+# Provides e2e testing and development commands
 
-.PHONY: help build test run clean package docker-build docker-run
+# Configuration
+COMPOSE_PROJECT = excalibase-rest-app
+COMPOSE_FILE = docker-compose.yml
+APP_PORT = 20000
+DB_PORT = 5432
+API_URL = http://localhost:$(APP_PORT)/api/v1
 
-# Default goal
+# Colors for output
+BLUE = \033[0;34m
+GREEN = \033[0;32m
+YELLOW = \033[1;33m
+RED = \033[0;31m
+NC = \033[0m # No Color
+
+# Default target
 .DEFAULT_GOAL := help
 
-# Variables
-APP_NAME := excalibase-rest
-VERSION := 1.0.0
-PORT := 8080
-
+# Help target
+.PHONY: help
 help: ## Show this help message
-	@echo "Available commands:"
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@echo "$(BLUE)Excalibase REST API - Available Commands$(NC)"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "$(YELLOW)Examples:$(NC)"
+	@echo "  make e2e            # Complete e2e test (build + test + cleanup)"
+	@echo "  make dev            # Build then start services and keep running"
+	@echo "  make up             # Pull and start service from docker hub "
+	@echo "  make test-only      # Run tests against running services"
+	@echo "  make clean          # Stop services and cleanup"
+	@echo ""
+	@echo "$(YELLOW)Development:$(NC)"
+	@echo "  make dev-setup      # Setup development database"
+	@echo "  make quick-start    # Database + Application startup"
+	@echo "  make run            # Run application locally"
+	@echo "  make test           # Run all tests"
+	@echo ""
+	@echo "$(YELLOW)CI/CD Integration:$(NC)"
+	@echo "  make ci             # Run complete CI pipeline"
 
-build: ## Build the application
-	@echo "Building $(APP_NAME)..."
-	mvn clean compile
+# Main targets
+.PHONY: e2e
+e2e: check-deps down build-image up test clean ## Complete e2e test suite (cleanup, build image, test, cleanup)
+	@echo "$(GREEN)🎉 E2E testing completed successfully!$(NC)"
 
-test: ## Run all tests
-	@echo "Running tests..."
-	mvn test
+.PHONY: dev
+dev: check-deps build-image up ## Start services for development (no cleanup)
+	@echo ""
+	@echo "$(GREEN)🚀 Development environment ready!$(NC)"
+	@echo ""
+	@echo "$(BLUE)REST API:$(NC) $(API_URL)"
+	@echo "$(BLUE)PostgreSQL:$(NC)  localhost:$(DB_PORT)"
+	@echo "$(BLUE)API Docs:$(NC)    $(API_URL)/docs"
+	@echo "$(BLUE)OpenAPI:$(NC)     $(API_URL)/openapi.json"
+	@echo ""
+	@echo "$(YELLOW)To run tests:$(NC) make test-only"
+	@echo "$(YELLOW)To cleanup:$(NC)  make clean"
+	@echo ""
 
+.PHONY: ci
+ci: check-deps-ci build-image up test clean ## CI/CD pipeline (with dependency checks)
+
+# Build targets
+.PHONY: build
+build: ## Build the application with Maven
+	@echo "$(BLUE)🔨 Building application...$(NC)"
+	@mvn clean package -DskipTests -q
+	@echo "$(GREEN)✓ Build completed$(NC)"
+
+.PHONY: build-image
+build-image: build ## Build Docker image locally for e2e testing
+	@echo "$(BLUE)🐳 Building Docker image...$(NC)"
+	@docker build -t excalibase/excalibase-rest .
+	@echo "$(GREEN)✓ Docker image built$(NC)"
+
+.PHONY: build-skip
+build-skip: ## Skip Maven build (for rapid iteration)
+	@echo "$(YELLOW)⚠️  Skipping Maven build$(NC)"
+
+# Service management
+.PHONY: up
+up: ## Start Docker services
+	@echo "$(BLUE)🚀 Starting services...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) down -v --remove-orphans > /dev/null 2>&1 || true
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) up -d
+	@echo "$(GREEN)✓ Services started$(NC)"
+	@$(MAKE) --no-print-directory wait-ready
+
+.PHONY: down
+down: ## Stop Docker services
+	@echo "$(BLUE)🛑 Stopping services...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) down -v --remove-orphans > /dev/null 2>&1 || true
+	@echo "$(GREEN)✓ Services stopped$(NC)"
+
+.PHONY: clean
+clean: down ## Clean up all resources
+	@echo "$(BLUE)🧹 Cleaning up...$(NC)"
+	@docker system prune -f > /dev/null 2>&1 || true
+	@echo "$(GREEN)✓ Cleanup completed$(NC)"
+
+# Development targets
+.PHONY: dev-setup
+dev-setup: ## Setup development environment with PostgreSQL
+	@echo "$(BLUE)🔧 Setting up development environment...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) up -d postgres
+	@echo "$(GREEN)✓ Development database ready$(NC)"
+	@echo "$(YELLOW)Database URL:$(NC) jdbc:postgresql://localhost:$(DB_PORT)/excalibase_rest"
+	@echo "$(YELLOW)Username:$(NC) testuser"
+	@echo "$(YELLOW)Password:$(NC) testpass"
+
+.PHONY: dev-teardown
+dev-teardown: ## Teardown development environment
+	@echo "$(BLUE)🔧 Tearing down development environment...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) down -v --remove-orphans > /dev/null 2>&1 || true
+	@echo "$(GREEN)✓ Development environment cleaned up$(NC)"
+
+.PHONY: quick-start
+quick-start: dev-setup run ## Quick start: setup database and run application
+	@echo "$(GREEN)🚀 Quick start completed!$(NC)"
+
+.PHONY: run
+run: ## Run application locally (requires database)
+	@echo "$(BLUE)▶️  Starting application locally...$(NC)"
+	@cd modules/excalibase-rest-api && mvn spring-boot:run -Dspring-boot.run.profiles=dev
+
+# Testing targets
+.PHONY: test
+test: up test-only ## Start services and run tests
+	@echo "$(GREEN)✓ Tests completed$(NC)"
+
+.PHONY: test-maven
+test-maven: ## Run all Maven tests
+	@echo "$(BLUE)🧪 Running all Maven tests...$(NC)"
+	@mvn test
+	@echo "$(GREEN)✓ All Maven tests passed$(NC)"
+
+.PHONY: test-integration
 test-integration: ## Run integration tests only
-	@echo "Running integration tests..."
-	mvn test -Dtest="*IntegrationTest"
+	@echo "$(BLUE)🧪 Running integration tests...$(NC)"
+	@mvn test -Dtest="*IntegrationTest"
+	@echo "$(GREEN)✓ Integration tests passed$(NC)"
 
-package: ## Package the application
-	@echo "Packaging $(APP_NAME)..."
-	mvn clean package -DskipTests
+.PHONY: test-unit
+test-unit: ## Run unit tests only
+	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
+	@mvn test -Dtest="*Test,!*IntegrationTest"
+	@echo "$(GREEN)✓ Unit tests passed$(NC)"
 
-install: ## Build and install the application
-	@echo "Installing $(APP_NAME)..."
-	mvn clean install
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage report
+	@echo "$(BLUE)📊 Running tests with coverage...$(NC)"
+	@mvn clean test jacoco:report
+	@echo "$(GREEN)✓ Coverage report generated$(NC)"
+	@echo "$(YELLOW)Report location:$(NC) target/site/jacoco/index.html"
 
-run: ## Run the application locally
-	@echo "Starting $(APP_NAME) on port $(PORT)..."
-	mvn spring-boot:run
+.PHONY: test-only
+test-only: ## Run E2E tests against running services
+	@echo "$(BLUE)🧪 Running E2E tests...$(NC)"
+	@$(MAKE) --no-print-directory run-tests
 
-dev: ## Run in development mode with hot reload
-	@echo "Starting $(APP_NAME) in development mode..."
-	mvn spring-boot:run -Dspring.profiles.active=dev
+.PHONY: test-quick
+test-quick: build-skip up test-only ## Quick test (skip build)
+	@echo "$(GREEN)✓ Quick tests completed$(NC)"
 
-clean: ## Clean build artifacts
-	@echo "Cleaning build artifacts..."
-	mvn clean
+# Wait for services
+.PHONY: wait-ready
+wait-ready: ## Wait for services to be ready
+	@echo "$(BLUE)⏳ Waiting for services...$(NC)"
+	@for i in $$(seq 1 30); do \
+		if docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) exec -T postgres pg_isready -U testuser -d excalibase_rest > /dev/null 2>&1; then \
+			echo "$(GREEN)✓ PostgreSQL ready$(NC)"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then \
+			echo "$(RED)❌ PostgreSQL failed to start$(NC)"; \
+			exit 1; \
+		fi; \
+		printf "."; \
+		sleep 2; \
+	done
+	@echo "$(BLUE)🔄 Waiting for application...$(NC)"
+	@sleep 10
+	@echo "$(GREEN)✓ All services ready$(NC)"
 
-coverage: ## Generate test coverage report
-	@echo "Generating test coverage report..."
-	mvn clean test jacoco:report
-	@echo "Coverage report available at: target/site/jacoco/index.html"
+.PHONY: run-tests
+run-tests: ## Execute the actual test suite
+	@./scripts/e2e-test.sh || (echo "$(RED)❌ Tests failed$(NC)" && exit 1)
 
-javadoc: ## Generate Javadoc
-	@echo "Generating Javadoc..."
-	mvn javadoc:javadoc
-	@echo "Javadoc available at: target/site/apidocs/index.html"
+# Status and logs
+.PHONY: status
+status: ## Show service status
+	@echo "$(BLUE)📊 Service Status$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) ps
 
-format: ## Format code using Maven formatter
-	@echo "Formatting code..."
-	mvn spotless:apply 2>/dev/null || echo "Spotless not configured, skipping..."
+.PHONY: logs
+logs: ## Show service logs
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) logs -f
 
-lint: ## Run code quality checks
-	@echo "Running code quality checks..."
-	mvn verify -DskipTests
+.PHONY: logs-app
+logs-app: ## Show application logs only
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) logs -f app
 
-# Docker targets
-docker-build: ## Build Docker image
-	@echo "Building Docker image..."
-	docker build -t $(APP_NAME):$(VERSION) .
-	docker tag $(APP_NAME):$(VERSION) $(APP_NAME):latest
+.PHONY: logs-db
+logs-db: ## Show database logs only
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) logs -f postgres
 
-docker-run: ## Run application in Docker
-	@echo "Running $(APP_NAME) in Docker..."
-	docker run -p $(PORT):$(PORT) --name $(APP_NAME) -d $(APP_NAME):latest
-
-docker-stop: ## Stop Docker container
-	@echo "Stopping $(APP_NAME) container..."
-	docker stop $(APP_NAME) || true
-	docker rm $(APP_NAME) || true
-
-# Database targets
-db-start: ## Start PostgreSQL with Docker
-	@echo "Starting PostgreSQL database..."
-	docker run --name excalibase-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
-	@echo "Database will be available in a few seconds at localhost:5432"
-	@echo "Default credentials: postgres/postgres"
-
-db-stop: ## Stop PostgreSQL container
-	@echo "Stopping PostgreSQL database..."
-	docker stop excalibase-postgres || true
-	docker rm excalibase-postgres || true
-
+# Database utilities
+.PHONY: db-shell
 db-shell: ## Connect to database shell
-	@echo "Connecting to database..."
-	docker exec -it excalibase-postgres psql -U postgres
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) exec postgres psql -U testuser -d excalibase_rest
 
-# API testing targets
-api-test: ## Test API endpoints (requires running application)
-	@echo "Testing API endpoints..."
-	@echo "Testing schema endpoint..."
-	curl -s http://localhost:$(PORT)/api/v1 | jq '.' || curl -s http://localhost:$(PORT)/api/v1
-	@echo "\nTesting OpenAPI spec..."
-	curl -s http://localhost:$(PORT)/api/v1/openapi.json | jq '.info' || echo "Application may not be running"
+.PHONY: db-reset
+db-reset: ## Reset database (recreate schema)
+	@echo "$(BLUE)🔄 Resetting database...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) exec postgres psql -U testuser -d excalibase_rest -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) restart app
+	@echo "$(GREEN)✓ Database reset completed$(NC)"
 
-health-check: ## Check application health
-	@echo "Checking application health..."
-	curl -s http://localhost:$(PORT)/actuator/health | jq '.' || echo "Application may not be running on port $(PORT)"
+# Docker utilities
+.PHONY: docker-build
+docker-build: ## Build Docker image
+	@echo "$(BLUE)🐳 Building Docker image...$(NC)"
+	@docker build -t excalibase/excalibase-rest:latest .
+	@echo "$(GREEN)✓ Docker image built$(NC)"
 
-# Development workflow
-dev-setup: db-start ## Setup development environment
-	@echo "Setting up development environment..."
-	@echo "Waiting for database to be ready..."
-	sleep 10
-	@echo "Development environment ready!"
-	@echo "Start the application with: make run"
+.PHONY: docker-push
+docker-push: docker-build ## Push Docker image to registry
+	@echo "$(BLUE)📤 Pushing Docker image...$(NC)"
+	@docker push excalibase/excalibase-rest:latest
+	@echo "$(GREEN)✓ Docker image pushed$(NC)"
 
-dev-teardown: db-stop docker-stop ## Teardown development environment
-	@echo "Development environment cleaned up"
+.PHONY: docker-run
+docker-run: ## Run application in Docker
+	@docker run -p $(APP_PORT):20000 \
+		-e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:$(DB_PORT)/excalibase_rest \
+		-e SPRING_DATASOURCE_USERNAME=testuser \
+		-e SPRING_DATASOURCE_PASSWORD=testpass \
+		excalibase/excalibase-rest:latest
 
-# Quick start
-quick-start: dev-setup run ## Quick start with database and application
+# Dependency checks
+.PHONY: check-deps
+check-deps: ## Check required dependencies
+	@echo "$(BLUE)🔍 Checking dependencies...$(NC)"
+	@command -v docker >/dev/null 2>&1 || { echo "$(RED)❌ Docker is required but not installed$(NC)"; exit 1; }
+	@command -v docker-compose >/dev/null 2>&1 || { echo "$(RED)❌ Docker Compose is required but not installed$(NC)"; exit 1; }
+	@command -v mvn >/dev/null 2>&1 || { echo "$(RED)❌ Maven is required but not installed$(NC)"; exit 1; }
+	@command -v java >/dev/null 2>&1 || { echo "$(RED)❌ Java is required but not installed$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ All dependencies available$(NC)"
 
-# Show application info
-info: ## Show application information
-	@echo "Application: $(APP_NAME)"
-	@echo "Version: $(VERSION)"
-	@echo "Port: $(PORT)"
-	@echo "API Base URL: http://localhost:$(PORT)/api/v1"
-	@echo "OpenAPI Spec: http://localhost:$(PORT)/api/v1/openapi.json"
-	@echo "Health Check: http://localhost:$(PORT)/actuator/health"
-	@echo "Documentation: http://localhost:$(PORT)/api/v1/docs"
+.PHONY: check-deps-ci
+check-deps-ci: ## Check dependencies for CI (no Maven required)
+	@echo "$(BLUE)🔍 Checking CI dependencies...$(NC)"
+	@command -v docker >/dev/null 2>&1 || (echo "$(RED)❌ Docker not found$(NC)" && exit 1)
+	@(command -v docker-compose >/dev/null 2>&1 || docker compose version >/dev/null 2>&1) || (echo "$(RED)❌ Docker Compose not found$(NC)" && exit 1)
+	@command -v curl >/dev/null 2>&1 || (echo "$(RED)❌ curl not found$(NC)" && exit 1)
+	@command -v jq >/dev/null 2>&1 || (echo "$(RED)❌ jq not found$(NC)" && exit 1)
+	@echo "$(GREEN)✓ All CI dependencies available$(NC)"
+
+# Package and distribution
+.PHONY: package
+package: ## Package application for distribution
+	@echo "$(BLUE)📦 Packaging application...$(NC)"
+	@mvn clean package -DskipTests
+	@echo "$(GREEN)✓ Application packaged$(NC)"
+	@echo "$(YELLOW)JAR location:$(NC) modules/excalibase-rest-api/target/excalibase-rest-api-*.jar"
+
+.PHONY: install
+install: ## Install application to local repository
+	@echo "$(BLUE)📦 Installing to local repository...$(NC)"
+	@mvn clean install
+	@echo "$(GREEN)✓ Application installed$(NC)"
+
+# Documentation
+.PHONY: docs-serve
+docs-serve: ## Serve documentation locally
+	@echo "$(BLUE)📖 Serving documentation...$(NC)"
+	@echo "$(YELLOW)Documentation will be available at: http://localhost:8000$(NC)"
+	@python3 -m http.server 8000 --directory docs
+
+# Utility targets
+.PHONY: install-deps
+install-deps: ## Install missing dependencies (macOS)
+	@echo "$(BLUE)📦 Installing dependencies...$(NC)"
+	@if ! command -v jq >/dev/null 2>&1; then \
+		echo "$(YELLOW)Installing jq...$(NC)"; \
+		brew install jq; \
+	fi
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "$(YELLOW)Please install Docker Desktop from: https://docker.com/products/docker-desktop$(NC)"; \
+	fi
+	@echo "$(GREEN)✓ Dependencies check completed$(NC)"
+
+# Development workflow targets
+.PHONY: restart
+restart: down up ## Restart services
+	@echo "$(GREEN)✓ Services restarted$(NC)"
+
+.PHONY: rebuild
+rebuild: clean build up ## Full rebuild and restart
+	@echo "$(GREEN)✓ Full rebuild completed$(NC)"
+
+# Health checks
+.PHONY: health
+health: ## Check API health
+	@echo "$(BLUE)🏥 Checking API health...$(NC)"
+	@curl -sf $(API_URL) > /dev/null && echo "$(GREEN)✓ API is healthy$(NC)" || echo "$(RED)❌ API is not responding$(NC)"
+
+.PHONY: test-connection
+test-connection: ## Test database connection
+	@echo "$(BLUE)🔗 Testing database connection...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT) exec postgres pg_isready -U testuser && echo "$(GREEN)✓ Database connection OK$(NC)" || echo "$(RED)❌ Database connection failed$(NC)"
+
+# Utility targets
+.PHONY: version
+version: ## Show application version
+	@mvn help:evaluate -Dexpression=project.version -q -DforceStdout
+
+.PHONY: info
+info: ## Show project information
+	@echo "$(BLUE)📋 Project Information$(NC)"
+	@echo "$(YELLOW)Name:$(NC) Excalibase REST API"
+	@echo "$(YELLOW)Version:$(NC) $$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
+	@echo "$(YELLOW)Java Version:$(NC) $$(mvn help:evaluate -Dexpression=maven.compiler.release -q -DforceStdout)"
+	@echo "$(YELLOW)Spring Boot Version:$(NC) $$(mvn help:evaluate -Dexpression=spring-boot.version -q -DforceStdout)"
+	@echo "$(YELLOW)API URL:$(NC) $(API_URL)"
+	@echo "$(YELLOW)Database Port:$(NC) $(DB_PORT)"

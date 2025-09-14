@@ -31,7 +31,7 @@ mvn clean package
 # Start application locally (requires PostgreSQL)
 mvn spring-boot:run
 
-# Application runs on http://localhost:8080/api/v1
+# Application runs on http://localhost:20000/api/v1
 ```
 
 ### Using Makefile
@@ -92,7 +92,7 @@ The application provides comprehensive PostgreSQL type mapping:
 
 ### Advanced Filtering System
 
-PostgREST-style filtering with operators:
+SQL-style filtering with operators:
 - **Basic**: eq, neq, gt, gte, lt, lte
 - **String**: like, ilike, startswith, endswith
 - **Array**: in, notin

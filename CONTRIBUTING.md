@@ -321,7 +321,7 @@ Returns 500 Internal Server Error
 
 ## Sample Request
 ```bash
-curl -X GET "http://localhost:8080/api/v1/customers?name=like.test"
+curl -X GET "http://localhost:20000/api/v1/customers?name=like.test"
 ```
 
 ## Error Logs

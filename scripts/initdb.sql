@@ -30,7 +30,7 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- Customers table with various PostgreSQL types
+-- Customers table with basic PostgreSQL types (simplified to avoid serialization issues)
 CREATE TABLE IF NOT EXISTS customers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     customer_id SERIAL UNIQUE NOT NULL,
@@ -41,8 +41,11 @@ CREATE TABLE IF NOT EXISTS customers (
     is_active BOOLEAN DEFAULT true,
     tier customer_tier DEFAULT 'bronze',
     profile JSONB DEFAULT '{}',
-    tags TEXT[] DEFAULT '{}',
-    addresses address[],
+    preferred_tags VARCHAR(255), -- Simplified from TEXT[] array
+    address_street VARCHAR(255), -- Simplified from address[] array
+    address_city VARCHAR(100),
+    address_state VARCHAR(50),
+    address_zip VARCHAR(20),
     ip_address INET,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -54,7 +57,6 @@ CREATE TABLE IF NOT EXISTS customers (
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 CREATE INDEX IF NOT EXISTS idx_customers_tier ON customers(tier);
 CREATE INDEX IF NOT EXISTS idx_customers_profile ON customers USING GIN(profile);
-CREATE INDEX IF NOT EXISTS idx_customers_tags ON customers USING GIN(tags);
 
 -- Products table
 CREATE TABLE IF NOT EXISTS products (
@@ -191,26 +193,26 @@ CREATE TABLE IF NOT EXISTS app_configurations (
 );
 
 -- Sample data insertion
-INSERT INTO customers (name, email, phone, date_of_birth, tier, profile, tags, ip_address) VALUES
+INSERT INTO customers (name, email, phone, date_of_birth, tier, profile, preferred_tags, address_street, address_city, address_state, address_zip, ip_address) VALUES
 ('John Doe', 'john.doe@example.com', '+1-555-0101', '1990-05-15', 'gold', 
  '{"preferences": {"notifications": true, "theme": "dark"}, "loyalty_points": 1250}',
- ARRAY['vip', 'early_adopter'], '192.168.1.100'),
+ 'vip,early_adopter', '123 Main St', 'New York', 'NY', '10001', '192.168.1.100'),
  
 ('Jane Smith', 'jane.smith@example.com', '+1-555-0102', '1985-08-22', 'platinum',
  '{"preferences": {"notifications": false, "theme": "light"}, "loyalty_points": 2500}',
- ARRAY['premium', 'frequent_buyer'], '192.168.1.101'),
+ 'premium,frequent_buyer', '456 Oak Ave', 'Los Angeles', 'CA', '90210', '192.168.1.101'),
  
 ('Bob Johnson', 'bob.johnson@example.com', '+1-555-0103', '1992-12-03', 'silver',
  '{"preferences": {"notifications": true, "theme": "auto"}, "loyalty_points": 750}',
- ARRAY['new_customer'], '10.0.0.50'),
+ 'new_customer', '789 Pine St', 'Chicago', 'IL', '60601', '10.0.0.50'),
  
 ('Alice Brown', 'alice.brown@example.com', '+1-555-0104', '1988-03-18', 'bronze',
  '{"preferences": {"notifications": true, "theme": "light"}, "loyalty_points": 100}',
- ARRAY['occasional_buyer'], '172.16.0.25'),
+ 'occasional_buyer', '321 Elm St', 'Boston', 'MA', '02101', '172.16.0.25'),
  
 ('Charlie Wilson', 'charlie.wilson@example.com', '+1-555-0105', '1995-11-08', 'gold',
  '{"preferences": {"notifications": false, "theme": "dark"}, "loyalty_points": 1100}',
- ARRAY['tech_enthusiast', 'reviewer'], '203.0.113.45');
+ 'tech_enthusiast,reviewer', '654 Maple Ave', 'Seattle', 'WA', '98101', '203.0.113.45');
 
 INSERT INTO products (sku, name, description, price, cost, weight, dimensions, categories, attributes, stock_quantity) VALUES
 ('LAPTOP-001', 'Gaming Laptop Pro', 'High-performance gaming laptop with RTX graphics', 1299.99, 899.99, 2.5,
@@ -251,7 +253,7 @@ INSERT INTO orders (order_number, customer_id, status, subtotal, tax_amount, shi
 SELECT 
   'ORD-' || LPAD((ROW_NUMBER() OVER())::text, 6, '0'),
   customer_id,
-  (ARRAY['pending', 'processing', 'shipped', 'delivered'])[floor(random() * 4 + 1)],
+  (ARRAY['pending', 'processing', 'shipped', 'delivered'])[floor(random() * 4 + 1)]::order_status,
   round((random() * 1000 + 50)::numeric, 2),
   round((random() * 100 + 5)::numeric, 2),
   round((random() * 50 + 10)::numeric, 2),

@@ -1,73 +1,54 @@
-version: '3.8'
-
 services:
-  # PostgreSQL database
   postgres:
     image: postgres:15-alpine
-    container_name: excalibase-postgres
+    container_name: excalibase-rest-postgres
     environment:
-      POSTGRES_DB: excalibase
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: excalibase_rest
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+      - ./scripts/initdb.sql:/docker-entrypoint-initdb.d/01-initdb.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U testuser -d excalibase_rest"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     networks:
-      - excalibase-network
+      - excalibase-rest-network
+    restart: unless-stopped
 
-  # Excalibase REST API
-  excalibase-rest:
-    build: .
+  app:
+    image: excalibase/excalibase-rest
     container_name: excalibase-rest-api
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/excalibase
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      # Database connection
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/excalibase_rest
+      SPRING_DATASOURCE_USERNAME: testuser
+      SPRING_DATASOURCE_PASSWORD: testpass
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      # Application settings
+      SERVER_PORT: 20000
       APP_ALLOWED_SCHEMA: public
+      APP_DATABASE_TYPE: postgres
       LOGGING_LEVEL_IO_GITHUB_EXCALIBASE: INFO
     ports:
-      - "8080:8080"
+      - "20000:20000"
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
     networks:
-      - excalibase-network
+      - excalibase-rest-network
     restart: unless-stopped
-
-  # pgAdmin for database management (optional)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: excalibase-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@excalibase.io
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-    networks:
-      - excalibase-network
-    profiles:
-      - admin
 
 volumes:
   postgres_data:
     driver: local
 
 networks:
-  excalibase-network:
+  excalibase-rest-network:
     driver: bridge
